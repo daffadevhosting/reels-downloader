@@ -124,17 +124,30 @@
         <!-- Input Card -->
         <div class="bg-gray-900/60 border border-gray-800/80 p-6 rounded-2xl shadow-2xl backdrop-blur-xl">
             <form id="downloadForm" class="space-y-4">
-                <div class="relative">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">
+                <div class="relative flex items-center">
+                    <span class="absolute left-0 pl-4 text-gray-500 pointer-events-none">
                         <i class="fa-solid fa-link text-lg"></i>
                     </span>
+                    
+                    <!-- Peningkatan Padding Kanan (pr-28) agar teks input tidak bertabrakan dengan tombol Tempel -->
                     <input 
                         type="url" 
                         id="fbUrl" 
-                        placeholder="Tempel tautan Facebook Reels di sini (e.g. https://www.facebook.com/share/r/...)" 
+                        placeholder="Tempel tautan Facebook Reels di sini..." 
                         required
-                        class="w-full pl-12 pr-4 py-4 bg-gray-950/80 border border-gray-800 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-100 placeholder-gray-500 transition-all text-sm sm:text-base shadow-inner"
+                        class="w-full pl-12 pr-28 py-4 bg-gray-950/80 border border-gray-800 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-100 placeholder-gray-500 transition-all text-sm sm:text-base shadow-inner"
                     >
+                    
+                    <!-- Tombol Tempel (Paste Button) di dalam Input Box -->
+                    <button 
+                        type="button" 
+                        id="btnPaste"
+                        class="absolute right-2 px-3.5 py-2 bg-gray-900 hover:bg-gray-800 active:bg-gray-950 text-blue-400 hover:text-blue-300 rounded-lg flex items-center gap-1.5 transition text-xs font-bold border border-gray-800 hover:border-gray-750 shadow-sm cursor-pointer select-none"
+                        title="Tempel dari papan klip"
+                    >
+                        <i class="fa-solid fa-paste"></i>
+                        <span>Tempel</span>
+                    </button>
                 </div>
                 <button 
                     type="submit" 
@@ -192,7 +205,7 @@
             </div>
             <div class="bg-gray-950/40 border border-gray-900 p-5 rounded-2xl">
                 <div class="text-indigo-500 font-bold text-lg mb-2"><i class="fa-solid fa-paste mr-1.5"></i> 2. Tempel Link</div>
-                <p class="text-gray-400 text-sm">Masukkan link tersebut ke dalam kolom input di atas dan klik tombol "Mulai Unduh".</p>
+                <p class="text-gray-400 text-sm">Gunakan tombol "Tempel" di dalam kolom di atas atau ketik langsung tautannya.</p>
             </div>
             <div class="bg-gray-950/40 border border-gray-900 p-5 rounded-2xl">
                 <div class="text-purple-500 font-bold text-lg mb-2"><i class="fa-solid fa-download mr-1.5"></i> 3. Simpan Video</div>
@@ -200,7 +213,7 @@
             </div>
         </div>
 
-        <!-- ================= SECTION SEO ARTIKEL (SANGAT DISUKAI GOOGLE) ================= -->
+        <!-- ================= SECTION SEO ARTIKEL ================= -->
         <section class="mt-20 border-t border-gray-800 pt-12 space-y-10 text-gray-300">
             <div>
                 <h2 class="text-2xl font-bold text-white mb-4">Fitur Utama Pengunduh Facebook Reels Warpzone</h2>
@@ -215,14 +228,14 @@
                 </ul>
             </div>
 
-            <!-- FAQ Accordion / Teks SEO -->
+            <!-- FAQ Accordion -->
             <div>
                 <h2 class="text-2xl font-bold text-white mb-6 text-center">Pertanyaan yang Sering Diajukan (FAQ)</h2>
                 <div class="space-y-6">
                     <div class="bg-gray-950/40 border border-gray-900 p-5 rounded-xl">
                         <h3 class="text-lg font-semibold text-white mb-2">Bagaimana cara mendownload Facebook Reels di HP Android atau iPhone?</h3>
                         <p class="text-gray-400 text-sm leading-relaxed">
-                            Cukup buka aplikasi Facebook, ketuk tombol bagikan pada Reels yang Anda inginkan, lalu pilih "Salin Tautan". Buka situs ini dari browser Chrome atau Safari Anda, tempel tautan ke kotak input di atas, lalu klik tombol "Ambil Video". Setelah itu, ketuk kualitas yang Anda inginkan untuk memulai unduhan otomatis.
+                            Cukup buka aplikasi Facebook, ketuk tombol bagikan pada Reels yang Anda inginkan, lalu pilih "Salin Tautan". Buka situs ini dari browser Chrome atau Safari Anda, ketuk tombol "Tempel" di dalam input bar untuk memasukkan tautan secara instan, lalu klik tombol "Ambil Video". Setelah itu, ketuk kualitas yang Anda inginkan untuk memulai unduhan otomatis.
                         </p>
                     </div>
                     <div class="bg-gray-950/40 border border-gray-900 p-5 rounded-xl">
@@ -243,6 +256,9 @@
 
     </main>
 
+    <!-- Custom Toast Notification Container (Untuk pesan kesalahan izin clipboard) -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
     <!-- Footer -->
     <footer class="border-t border-gray-900 bg-gray-950/60 py-6 text-center text-sm text-gray-500">
         <p>&copy; 2026 FB Reels Downloader. Didukung oleh Cloudflare Workers & Warpzone API.</p>
@@ -260,8 +276,61 @@
         const videoTitle = document.getElementById('videoTitle');
         const downloadButtons = document.getElementById('downloadButtons');
         
+        // Elemen Tambahan untuk Fitur Tempel
+        const btnPaste = document.getElementById('btnPaste');
+        const fbUrlInput = document.getElementById('fbUrl');
+        const toastContainer = document.getElementById('toastContainer');
+        
         // Alamat Cloudflare Worker API
         const API_URL = 'https://reels-downloader.warpzone.workers.dev';
+
+        // Fungsi Kustom untuk Toast Notification (Mengganti window.alert)
+        function showToast(message, type = 'error') {
+            const toast = document.createElement('div');
+            toast.className = `p-4 rounded-xl shadow-lg border text-sm transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto flex items-center gap-2 max-w-sm ${
+                type === 'error' 
+                    ? 'bg-red-950/90 border-red-800/80 text-red-200' 
+                    : 'bg-green-950/90 border-green-800/80 text-green-200'
+            }`;
+            
+            const icon = type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+            toast.innerHTML = `<i class="fa-solid ${icon} text-md"></i> <span>${message}</span>`;
+            
+            toastContainer.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+            
+            // Auto remove setelah 4 detik
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 4000);
+        }
+
+        // Event Listener untuk Tombol Tempel (Paste)
+        btnPaste.addEventListener('click', async () => {
+            try {
+                // Mencoba membaca data dari clipboard pengguna
+                const text = await navigator.clipboard.readText();
+                if (text && text.trim().startsWith('http')) {
+                    fbUrlInput.value = text.trim();
+                    showToast('Tautan berhasil ditempel!', 'success');
+                } else if (text) {
+                    fbUrlInput.value = text.trim();
+                    showToast('Teks berhasil ditempel, namun pastikan itu adalah link Facebook yang valid.', 'error');
+                } else {
+                    showToast('Papan klip kosong.', 'error');
+                }
+            } catch (err) {
+                console.error('Gagal mengakses clipboard:', err);
+                showToast('Gagal membaca clipboard. Silakan beri izin akses atau tempel secara manual.', 'error');
+            }
+        });
 
         // Fungsi utama untuk memaksa download file biner video (Force Download)
         async function forceDownload(url, filename) {
@@ -300,7 +369,7 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const targetUrl = document.getElementById('fbUrl').value.trim();
+            const targetUrl = fbUrlInput.value.trim();
             if (!targetUrl) return;
 
             loading.classList.remove('hidden');
