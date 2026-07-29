@@ -333,39 +333,43 @@
         });
 
         // Fungsi utama untuk memaksa download file biner video (Force Download)
-        async function forceDownload(url, filename) {
-            loading.classList.remove('hidden');
-            loadingText.textContent = 'Mendownload file video ke browser (Mohon tunggu sebentar)...';
-            errorBox.classList.add('hidden');
-            
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Gagal mengambil file video dari server CDN.');
-                
-                const blob = await response.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
-                
-                const tempLink = document.createElement('a');
-                tempLink.style.display = 'none';
-                tempLink.href = blobUrl;
-                tempLink.setAttribute('download', filename);
-                
-                document.body.appendChild(tempLink);
-                tempLink.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(tempLink);
-                    window.URL.revokeObjectURL(blobUrl);
-                }, 100);
-                
-            } catch (err) {
-                console.error(err);
-                window.open(url, '_blank');
-            } finally {
-                loading.classList.add('hidden');
-                loadingText.textContent = 'Menghubungkan ke API Warpzone & mengekstrak video...';
-            }
-        }
+// Fungsi forceDownload diperbarui untuk menggunakan Proxy Worker
+async function forceDownload(url, filename) {
+    loading.classList.remove('hidden');
+    loadingText.textContent = 'Mendownload file video ke browser...';
+    errorBox.classList.add('hidden');
+    
+    try {
+        // Mengarahkan fetch melalui Proxy Worker untuk menghindari CORS error
+        const proxyApiUrl = `${API_URL}/?proxy=1&video_url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyApiUrl);
+        
+        if (!response.ok) throw new Error('Gagal mengambil file video dari Proxy Worker.');
+        
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        const tempLink = document.createElement('a');
+        tempLink.style.display = 'none';
+        tempLink.href = blobUrl;
+        tempLink.setAttribute('download', filename);
+        
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(tempLink);
+            window.URL.revokeObjectURL(blobUrl);
+        }, 100);
+        
+    } catch (err) {
+        console.error('Proxy download failed, opening direct link instead:', err);
+        window.open(url, '_blank');
+    } finally {
+        loading.classList.add('hidden');
+        loadingText.textContent = 'Menghubungkan ke API Warpzone & mengekstrak video...';
+    }
+}
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
